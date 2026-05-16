@@ -657,6 +657,7 @@
         const pinnedFiles    = ["تعليمات.pdf"];
         const PINNED_FOLDER  = "📌 ملفات مثبتة";
         const GENERAL_FOLDER = "ملفات عامة";
+        let folderColorMap = new Map();
         const FOLDER_COLOR_PALETTE = [
           "#0f766e",
           "#b91c1c",
@@ -738,8 +739,52 @@
           return hash;
         }
 
+        function getRootFolder(folderPath) {
+          const parts = String(folderPath).split("/").filter(Boolean);
+          return parts[0] || GENERAL_FOLDER;
+        }
+
+        function buildFolderColorMap(folderNames) {
+          const map = new Map();
+          const usedIndexes = new Set();
+          const rootFolders = [];
+          let previousIndex = -1;
+
+          for (const folderName of folderNames) {
+            const rootFolder = getRootFolder(folderName);
+            if (!rootFolders.includes(rootFolder)) rootFolders.push(rootFolder);
+          }
+
+          for (const rootFolder of rootFolders) {
+            let colorIndex =
+              getStringHash(rootFolder) % FOLDER_COLOR_PALETTE.length;
+
+            if (usedIndexes.size < FOLDER_COLOR_PALETTE.length) {
+              let attempts = 0;
+              while (
+                (usedIndexes.has(colorIndex) || colorIndex === previousIndex) &&
+                attempts < FOLDER_COLOR_PALETTE.length
+              ) {
+                colorIndex = (colorIndex + 1) % FOLDER_COLOR_PALETTE.length;
+                attempts++;
+              }
+              usedIndexes.add(colorIndex);
+            } else if (colorIndex === previousIndex) {
+              colorIndex = (colorIndex + 1) % FOLDER_COLOR_PALETTE.length;
+            }
+
+            map.set(rootFolder, FOLDER_COLOR_PALETTE[colorIndex]);
+            previousIndex = colorIndex;
+          }
+
+          return map;
+        }
+
         function getFolderColor(folderKey) {
-          const index = getStringHash(folderKey) % FOLDER_COLOR_PALETTE.length;
+          const rootFolder = getRootFolder(folderKey);
+          if (folderColorMap.has(rootFolder)) return folderColorMap.get(rootFolder);
+
+          const index = getStringHash(rootFolder) % FOLDER_COLOR_PALETTE.length;
           return FOLDER_COLOR_PALETTE[index];
         }
 
@@ -751,9 +796,10 @@
 
         function getDisplayPathHtml(folderPath) {
           const rawParts = String(folderPath).split("/").filter(Boolean);
+          const folderColor = getFolderColor(folderPath);
           const parts = rawParts
             .map((part, index) => ({
-              color: getFolderColor(rawParts.slice(0, index + 1).join("/")),
+              color: folderColor,
               name: getDisplayName(part),
             }))
             .filter((part) => part.name);
@@ -962,6 +1008,7 @@
             return a.localeCompare(b, "ar");
           });
 
+          folderColorMap = buildFolderColorMap(folderNames);
           fileListElement.innerHTML = "";
           let isFirstFolder = true;
           let totalFiles    = 0;
