@@ -232,6 +232,8 @@
 
       .folder-header-content {
         padding: 10px 6px 5px !important;
+        border-right: 4px solid var(--folder-color, var(--primary-color));
+        border-radius: var(--radius);
       }
 
       .folder-title {
@@ -247,7 +249,7 @@
       /* إصلاح: استخدام fa-chevron-down وتدوير 0 عند الانطواء لوضوح أفضل في RTL */
       .folder-title .arrow-icon {
         font-size: 0.7rem;
-        color: var(--light-text);
+        color: var(--folder-color, var(--light-text));
         transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
         transform: rotate(-90deg); /* مغلق = يشير يساراً */
         margin-left: 6px;
@@ -274,23 +276,19 @@
         display: inline-flex;
         align-items: center;
         gap: 3px;
+        color: var(--folder-part-color, var(--folder-color, var(--primary-color)));
       }
 
-      .folder-level-0 { color: #075f50; }
-      .folder-level-1 { color: #7a520b; }
-      .folder-level-2 { color: #385a8a; }
-      .folder-level-3 { color: #7a3b5a; }
-      .folder-level-0 .folder-icon { color: #0b7c68; }
-      .folder-level-1 .folder-icon { color: #b7791f; }
-      .folder-level-2 .folder-icon { color: #4e72a8; }
-      .folder-level-3 .folder-icon { color: #9d5273; }
+      .folder-path-part .folder-icon {
+        color: var(--folder-part-color, var(--folder-color, var(--primary-color)));
+      }
 
       .folder-separator { color: var(--light-text); font-weight: 400; }
 
       .folder-title .file-count {
         font-size: 0.75rem;
         font-weight: 400;
-        color: var(--light-text);
+        color: var(--folder-color, var(--light-text));
         margin-right: 5px;
       }
 
@@ -659,6 +657,26 @@
         const pinnedFiles    = ["تعليمات.pdf"];
         const PINNED_FOLDER  = "📌 ملفات مثبتة";
         const GENERAL_FOLDER = "ملفات عامة";
+        const FOLDER_COLOR_PALETTE = [
+          "#0f766e",
+          "#b91c1c",
+          "#1d4ed8",
+          "#b45309",
+          "#6d28d9",
+          "#be185d",
+          "#047857",
+          "#c2410c",
+          "#4338ca",
+          "#0e7490",
+          "#a21caf",
+          "#15803d",
+          "#92400e",
+          "#991b1b",
+          "#0369a1",
+          "#7c2d12",
+          "#4c1d95",
+          "#166534",
+        ];
 
         /* ────── الوضع الداكن ────── */
         function initDarkMode() {
@@ -712,6 +730,19 @@
             .trim();
         }
 
+        function getStringHash(value) {
+          let hash = 0;
+          for (const char of String(value)) {
+            hash = (hash * 31 + char.codePointAt(0)) >>> 0;
+          }
+          return hash;
+        }
+
+        function getFolderColor(folderKey) {
+          const index = getStringHash(folderKey) % FOLDER_COLOR_PALETTE.length;
+          return FOLDER_COLOR_PALETTE[index];
+        }
+
         function getFolderPath(filepath) {
           const parts = normalizePath(filepath).split("/").filter(Boolean);
           parts.pop();
@@ -719,17 +750,20 @@
         }
 
         function getDisplayPathHtml(folderPath) {
-          const parts = String(folderPath)
-            .split("/")
-            .map(getDisplayName)
-            .filter(Boolean);
+          const rawParts = String(folderPath).split("/").filter(Boolean);
+          const parts = rawParts
+            .map((part, index) => ({
+              color: getFolderColor(rawParts.slice(0, index + 1).join("/")),
+              name: getDisplayName(part),
+            }))
+            .filter((part) => part.name);
 
           return parts
             .map(
-              (part, index) => `
-                <span class="folder-path-part folder-level-${Math.min(index, 3)}">
+              (part) => `
+                <span class="folder-path-part" style="--folder-part-color: ${part.color};">
                   <i class="fa-solid fa-folder-open folder-icon"></i>
-                  <span>${escapeHtml(part)}</span>
+                  <span>${escapeHtml(part.name)}</span>
                 </span>`
             )
             .join('<span class="folder-separator"> / </span>');
@@ -943,6 +977,7 @@
             header.dataset.folderName = folderName;
             header.dataset.isExpanded = isFirstFolder ? "true" : "false";
             header.tabIndex           = 0;
+            header.style.setProperty("--folder-color", getFolderColor(folderName));
 
             header.innerHTML = `
               <td colspan="2" class="folder-header-content">
