@@ -788,6 +788,55 @@
           return FOLDER_COLOR_PALETTE[index];
         }
 
+        function getFolderDepth(folderPath) {
+          const parts = String(folderPath).split("/").filter(Boolean);
+          return Math.max(parts.length - 1, 0);
+        }
+
+        function hexToRgb(hex) {
+          const clean = String(hex || "").replace("#", "").trim();
+          const value = clean.length === 3
+            ? clean.split("").map((char) => char + char).join("")
+            : clean;
+
+          if (!/^[0-9a-fA-F]{6}$/.test(value)) return null;
+
+          return {
+            r: parseInt(value.slice(0, 2), 16),
+            g: parseInt(value.slice(2, 4), 16),
+            b: parseInt(value.slice(4, 6), 16),
+          };
+        }
+
+        function rgbToHex({ r, g, b }) {
+          return [r, g, b]
+            .map((channel) =>
+              Math.max(0, Math.min(255, Math.round(channel)))
+                .toString(16)
+                .padStart(2, "0")
+            )
+            .join("");
+        }
+
+        function mixHexColor(color, target, amount) {
+          const from = hexToRgb(color);
+          const to = hexToRgb(target);
+          if (!from || !to) return color;
+
+          const ratio = Math.max(0, Math.min(1, amount));
+          return `#${rgbToHex({
+            r: from.r + (to.r - from.r) * ratio,
+            g: from.g + (to.g - from.g) * ratio,
+            b: from.b + (to.b - from.b) * ratio,
+          })}`;
+        }
+
+        function getFolderShade(folderKey, level = getFolderDepth(folderKey)) {
+          const baseColor = getFolderColor(folderKey);
+          const shadeAmount = Math.min(Math.max(level, 0) * 0.16, 0.42);
+          return mixHexColor(baseColor, "#ffffff", shadeAmount);
+        }
+
         function getFolderPath(filepath) {
           const parts = normalizePath(filepath).split("/").filter(Boolean);
           parts.pop();
@@ -796,10 +845,9 @@
 
         function getDisplayPathHtml(folderPath) {
           const rawParts = String(folderPath).split("/").filter(Boolean);
-          const folderColor = getFolderColor(folderPath);
           const parts = rawParts
             .map((part, index) => ({
-              color: folderColor,
+              color: getFolderShade(folderPath, index),
               name: getDisplayName(part),
             }))
             .filter((part) => part.name);
@@ -1024,7 +1072,7 @@
             header.dataset.folderName = folderName;
             header.dataset.isExpanded = isFirstFolder ? "true" : "false";
             header.tabIndex           = 0;
-            header.style.setProperty("--folder-color", getFolderColor(folderName));
+            header.style.setProperty("--folder-color", getFolderShade(folderName));
 
             header.innerHTML = `
               <td colspan="2" class="folder-header-content">
